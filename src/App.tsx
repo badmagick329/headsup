@@ -604,14 +604,14 @@ function RoundScreen({
           <button
             type="button"
             aria-label="Skip prompt"
-            className="absolute inset-y-0 left-0 bg-transparent select-none"
+            className="absolute inset-y-0 left-0 z-20 bg-transparent select-none"
             style={{ width: `${50 - FULLSCREEN_TAP_ZONE_INSET_PERCENT}%` }}
             onClick={onTapSkip}
           />
           <button
             type="button"
             aria-label="Mark prompt correct"
-            className="absolute inset-y-0 right-0 bg-transparent select-none"
+            className="absolute inset-y-0 right-0 z-20 bg-transparent select-none"
             style={{ width: `${50 - FULLSCREEN_TAP_ZONE_INSET_PERCENT}%` }}
             onClick={onTapCorrect}
           />
@@ -626,7 +626,7 @@ function RoundScreen({
             <span>Tap right for correct</span>
           </div>
 
-          <p className="relative z-10 max-w-6xl select-none px-8 text-5xl font-black uppercase leading-tight tracking-[0.04em] sm:text-7xl lg:text-9xl">
+          <p className="pointer-events-none relative z-10 max-w-6xl select-none px-8 text-5xl font-black uppercase leading-tight tracking-[0.04em] sm:text-7xl lg:text-9xl">
             {round.currentPrompt ?? 'Round complete'}
           </p>
         </div>
