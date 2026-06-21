@@ -233,10 +233,10 @@ function App() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-2">
               <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#1f7a3d]">
-                Heads Up MVP
+                Heads Up
               </p>
               <h1 className="text-4xl font-black uppercase tracking-[0.06em] sm:text-6xl">
-                Guess fast.
+                Heads Up
               </h1>
             </div>
 
@@ -600,18 +600,18 @@ function RoundScreen({
           </Button>
         </div>
 
-        <div className="relative flex flex-1 items-center justify-center overflow-hidden px-6 py-12 text-center">
+        <div className="relative flex flex-1 select-none items-center justify-center overflow-hidden px-6 py-12 text-center">
           <button
             type="button"
             aria-label="Skip prompt"
-            className="absolute inset-y-0 left-0 bg-transparent"
+            className="absolute inset-y-0 left-0 bg-transparent select-none"
             style={{ width: `${50 - FULLSCREEN_TAP_ZONE_INSET_PERCENT}%` }}
             onClick={onTapSkip}
           />
           <button
             type="button"
             aria-label="Mark prompt correct"
-            className="absolute inset-y-0 right-0 bg-transparent"
+            className="absolute inset-y-0 right-0 bg-transparent select-none"
             style={{ width: `${50 - FULLSCREEN_TAP_ZONE_INSET_PERCENT}%` }}
             onClick={onTapCorrect}
           />
@@ -626,7 +626,7 @@ function RoundScreen({
             <span>Tap right for correct</span>
           </div>
 
-          <p className="relative z-10 max-w-6xl px-8 text-5xl font-black uppercase leading-tight tracking-[0.04em] sm:text-7xl lg:text-9xl">
+          <p className="relative z-10 max-w-6xl select-none px-8 text-5xl font-black uppercase leading-tight tracking-[0.04em] sm:text-7xl lg:text-9xl">
             {round.currentPrompt ?? 'Round complete'}
           </p>
         </div>
@@ -644,7 +644,7 @@ function RoundScreen({
 
       <div
         className={[
-          'relative flex flex-1 items-center justify-center border border-black px-6 py-12 text-center',
+          'relative flex flex-1 select-none items-center justify-center border border-black px-6 py-12 text-center',
           tapControlsEnabled ? 'cursor-pointer select-none' : '',
         ]
           .filter(Boolean)
@@ -655,13 +655,13 @@ function RoundScreen({
             <button
               type="button"
               aria-label="Skip prompt"
-              className="absolute inset-y-0 left-0 w-1/2 bg-transparent"
+              className="absolute inset-y-0 left-0 w-1/2 bg-transparent select-none"
               onClick={onTapSkip}
             />
             <button
               type="button"
               aria-label="Mark prompt correct"
-              className="absolute inset-y-0 right-0 w-1/2 bg-transparent"
+              className="absolute inset-y-0 right-0 w-1/2 bg-transparent select-none"
               onClick={onTapCorrect}
             />
             <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-between px-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#1f7a3d] sm:px-6">
@@ -671,7 +671,7 @@ function RoundScreen({
           </>
         ) : null}
 
-        <p className="relative z-10 text-4xl font-black uppercase leading-tight tracking-[0.04em] sm:text-6xl lg:text-8xl">
+        <p className="relative z-10 select-none text-4xl font-black uppercase leading-tight tracking-[0.04em] sm:text-6xl lg:text-8xl">
           {round.currentPrompt ?? 'No prompts left'}
         </p>
       </div>
