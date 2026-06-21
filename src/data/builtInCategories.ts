@@ -1,0 +1,55 @@
+import type { Category } from '../types'
+
+export const builtInCategories: Category[] = [
+  {
+    id: 'movies',
+    name: 'Movies',
+    source: 'built_in',
+    prompts: [
+      'Jurassic Park',
+      'The Matrix',
+      'Titanic',
+      'The Godfather',
+      'Toy Story',
+      'Inception',
+      'The Dark Knight',
+      'Jaws',
+      'Finding Nemo',
+      'Back to the Future',
+    ],
+  },
+  {
+    id: 'famous-people',
+    name: 'Famous People',
+    source: 'built_in',
+    prompts: [
+      'Taylor Swift',
+      'David Beckham',
+      'Beyonce',
+      'Barack Obama',
+      'Lionel Messi',
+      'Oprah Winfrey',
+      'Adele',
+      'Elon Musk',
+      'Serena Williams',
+      'Keanu Reeves',
+    ],
+  },
+  {
+    id: 'places',
+    name: 'Places',
+    source: 'built_in',
+    prompts: [
+      'Paris',
+      'The Grand Canyon',
+      'Tokyo',
+      'Mount Everest',
+      'New York City',
+      'The Sahara Desert',
+      'Sydney Opera House',
+      'The Nile',
+      'Rome',
+      'The Moon',
+    ],
+  },
+]
