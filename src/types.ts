@@ -13,6 +13,8 @@ export type RoundEndReason = 'timer' | 'manual'
 
 export type RoundActionType = 'correct' | 'skip'
 
+export type TapControlAvailability = 'mobile' | 'desktop'
+
 export type SeenPrompt = {
   value: string
   action: RoundActionType

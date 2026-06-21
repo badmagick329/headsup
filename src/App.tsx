@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from './components/Button'
 import { SectionTitle } from './components/SectionTitle'
-import { createRoundState, finalizeRound, tickRound, applyRoundAction } from './game/round'
+import { applyRoundAction, createRoundState, finalizeRound, tickRound } from './game/round'
+import { useTapControlAvailability } from './hooks/useTapControlAvailability'
 import { LocalStorageCategoryStorage } from './storage/categoryStorage'
 import type { Category, RoundResult, RoundState } from './types'
 
 type ScreenState =
   | { screen: 'home' }
   | { screen: 'create' }
-  | { screen: 'round'; round: RoundState }
+  | { screen: 'pre_round'; category: Category }
+  | { screen: 'round'; round: RoundState; tapControlsEnabled: boolean }
   | { screen: 'results'; result: RoundResult }
 
 const storage = new LocalStorageCategoryStorage()
+const TAP_ZONE_COOLDOWN_MS = 450
+const FULLSCREEN_TAP_ZONE_INSET_PERCENT = 8
 
 type CreateCategoryFormProps = {
   onCancel: () => void
@@ -29,7 +33,10 @@ function App() {
     name?: string
     prompts?: string
   }>({})
+  const [preRoundTapControlsEnabled, setPreRoundTapControlsEnabled] = useState(false)
   const lastRoundCategoryIdRef = useRef<string | null>(null)
+  const tapZoneCooldownRef = useRef<number>(0)
+  const tapControlAvailability = useTapControlAvailability()
 
   useEffect(() => {
     storage.initializeBuiltInsIfMissing()
@@ -59,6 +66,7 @@ function App() {
         return {
           screen: 'round',
           round: nextRound,
+          tapControlsEnabled: current.tapControlsEnabled,
         }
       })
     }, 1000)
@@ -102,11 +110,22 @@ function App() {
     setCategories(storage.listCategories())
   }
 
-  function startRound(category: Category) {
+  function openPreRound(category: Category) {
     lastRoundCategoryIdRef.current = category.id
+    setPreRoundTapControlsEnabled(false)
+    setScreenState({
+      screen: 'pre_round',
+      category,
+    })
+  }
+
+  function startRound(category: Category, tapControlsEnabled: boolean) {
+    lastRoundCategoryIdRef.current = category.id
+    tapZoneCooldownRef.current = 0
     setScreenState({
       screen: 'round',
       round: createRoundState(category),
+      tapControlsEnabled,
     })
   }
 
@@ -120,7 +139,7 @@ function App() {
       return
     }
 
-    startRound(category)
+    openPreRound(category)
   }
 
   function handleRoundAction(action: 'correct' | 'skip') {
@@ -129,11 +148,32 @@ function App() {
         return current
       }
 
+      const nextRound = applyRoundAction(current.round, action)
+
+      if (nextRound.currentPrompt === null) {
+        return {
+          screen: 'results',
+          result: finalizeRound(nextRound, 'manual'),
+        }
+      }
+
       return {
         screen: 'round',
-        round: applyRoundAction(current.round, action),
+        round: nextRound,
+        tapControlsEnabled: current.tapControlsEnabled,
       }
     })
+  }
+
+  function handleTapZoneAction(action: 'correct' | 'skip') {
+    const now = Date.now()
+
+    if (now < tapZoneCooldownRef.current) {
+      return
+    }
+
+    tapZoneCooldownRef.current = now + TAP_ZONE_COOLDOWN_MS
+    handleRoundAction(action)
   }
 
   function endRound(reason: 'timer' | 'manual') {
@@ -201,7 +241,12 @@ function App() {
             </div>
 
             {screenState.screen !== 'home' ? (
-              <Button onClick={() => setScreenState({ screen: 'home' })}>
+              <Button
+                onClick={() => {
+                  setPreRoundTapControlsEnabled(false)
+                  setScreenState({ screen: 'home' })
+                }}
+              >
                 Home
               </Button>
             ) : null}
@@ -218,7 +263,7 @@ function App() {
                 setScreenState({ screen: 'create' })
               }}
               onDeleteCategory={handleDeleteCategory}
-              onStartRound={startRound}
+              onStartRound={openPreRound}
             />
           ) : null}
 
@@ -230,9 +275,33 @@ function App() {
             />
           ) : null}
 
+          {screenState.screen === 'pre_round' ? (
+            <PreRoundScreen
+              category={screenState.category}
+              tapControlsAvailable={tapControlAvailability === 'mobile'}
+              tapControlsEnabled={preRoundTapControlsEnabled}
+              onToggleTapControls={() =>
+                setPreRoundTapControlsEnabled((current) => !current)
+              }
+              onBack={() => {
+                setPreRoundTapControlsEnabled(false)
+                setScreenState({ screen: 'home' })
+              }}
+              onStart={() =>
+                startRound(
+                  screenState.category,
+                  tapControlAvailability === 'mobile' && preRoundTapControlsEnabled,
+                )
+              }
+            />
+          ) : null}
+
           {screenState.screen === 'round' ? (
             <RoundScreen
               round={screenState.round}
+              tapControlsEnabled={screenState.tapControlsEnabled}
+              onTapSkip={() => handleTapZoneAction('skip')}
+              onTapCorrect={() => handleTapZoneAction('correct')}
               onCorrect={() => handleRoundAction('correct')}
               onSkip={() => handleRoundAction('skip')}
               onEndRound={() => endRound('manual')}
@@ -243,7 +312,10 @@ function App() {
             <ResultsScreen
               result={screenState.result}
               onPlayAgain={replayLastRound}
-              onReturnHome={() => setScreenState({ screen: 'home' })}
+              onReturnHome={() => {
+                setPreRoundTapControlsEnabled(false)
+                setScreenState({ screen: 'home' })
+              }}
             />
           ) : null}
         </section>
@@ -428,14 +500,140 @@ function CreateCategoryScreen({
   )
 }
 
+type PreRoundScreenProps = {
+  category: Category
+  tapControlsAvailable: boolean
+  tapControlsEnabled: boolean
+  onToggleTapControls: () => void
+  onBack: () => void
+  onStart: () => void
+}
+
+function PreRoundScreen({
+  category,
+  tapControlsAvailable,
+  tapControlsEnabled,
+  onToggleTapControls,
+  onBack,
+  onStart,
+}: PreRoundScreenProps) {
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8">
+      <div className="space-y-3">
+        <SectionTitle>Get ready</SectionTitle>
+        <p className="text-lg leading-7">
+          Next category: <span className="font-bold uppercase">{category.name}</span>
+        </p>
+      </div>
+
+      <div className="space-y-6 border-y border-black py-6">
+        <div className="space-y-2">
+          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#1f7a3d]">
+            Tap controls
+          </p>
+          <p className="text-lg leading-7">
+            If enabled on mobile, tapping the left side of the prompt skips and
+            tapping the right side marks correct.
+          </p>
+        </div>
+
+        {tapControlsAvailable ? (
+          <div className="border-t border-black pt-6">
+            <Button
+              variant={tapControlsEnabled ? 'primary' : 'secondary'}
+              onClick={onToggleTapControls}
+            >
+              {tapControlsEnabled ? 'Tap controls on' : 'Enable tap controls'}
+            </Button>
+          </div>
+        ) : (
+          <p className="text-base leading-7">
+            Tap controls are only shown on mobile-style devices. This round will
+            use buttons and keyboard controls.
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <Button variant="primary" onClick={onStart}>
+          Start round
+        </Button>
+        <Button onClick={onBack}>Back</Button>
+      </div>
+    </div>
+  )
+}
+
 type RoundScreenProps = {
   round: RoundState
+  tapControlsEnabled: boolean
+  onTapSkip: () => void
+  onTapCorrect: () => void
   onCorrect: () => void
   onSkip: () => void
   onEndRound: () => void
 }
 
-function RoundScreen({ round, onCorrect, onSkip, onEndRound }: RoundScreenProps) {
+function RoundScreen({
+  round,
+  tapControlsEnabled,
+  onTapSkip,
+  onTapCorrect,
+  onCorrect,
+  onSkip,
+  onEndRound,
+}: RoundScreenProps) {
+  if (tapControlsEnabled) {
+    return (
+      <div className="fixed inset-0 z-50 flex min-h-screen flex-col bg-white text-black">
+        <div className="flex items-start justify-between gap-4 border-b border-black px-5 py-5 sm:px-8">
+          <div className="space-y-4">
+            <StatBlock label="Category" value={round.categoryName} />
+            <div className="flex gap-8">
+              <StatBlock label="Time" value={`${round.remainingTime}s`} />
+              <StatBlock label="Score" value={String(round.score)} />
+            </div>
+          </div>
+
+          <Button variant="danger" onClick={onEndRound}>
+            End round
+          </Button>
+        </div>
+
+        <div className="relative flex flex-1 items-center justify-center overflow-hidden px-6 py-12 text-center">
+          <button
+            type="button"
+            aria-label="Skip prompt"
+            className="absolute inset-y-0 left-0 bg-transparent"
+            style={{ width: `${50 - FULLSCREEN_TAP_ZONE_INSET_PERCENT}%` }}
+            onClick={onTapSkip}
+          />
+          <button
+            type="button"
+            aria-label="Mark prompt correct"
+            className="absolute inset-y-0 right-0 bg-transparent"
+            style={{ width: `${50 - FULLSCREEN_TAP_ZONE_INSET_PERCENT}%` }}
+            onClick={onTapCorrect}
+          />
+
+          <div
+            className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 border-l border-r border-dashed border-neutral-300"
+            style={{ width: `${FULLSCREEN_TAP_ZONE_INSET_PERCENT * 2}%` }}
+          />
+
+          <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-between px-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#1f7a3d] sm:px-6">
+            <span>Tap left to skip</span>
+            <span>Tap right for correct</span>
+          </div>
+
+          <p className="relative z-10 max-w-6xl px-8 text-5xl font-black uppercase leading-tight tracking-[0.04em] sm:text-7xl lg:text-9xl">
+            {round.currentPrompt ?? 'Round complete'}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-1 flex-col justify-between gap-8">
       <div className="grid gap-4 border-b border-black pb-6 sm:grid-cols-3">
@@ -444,8 +642,36 @@ function RoundScreen({ round, onCorrect, onSkip, onEndRound }: RoundScreenProps)
         <StatBlock label="Score" value={String(round.score)} />
       </div>
 
-      <div className="flex flex-1 items-center justify-center border border-black px-6 py-12 text-center">
-        <p className="text-4xl font-black uppercase leading-tight tracking-[0.04em] sm:text-6xl lg:text-8xl">
+      <div
+        className={[
+          'relative flex flex-1 items-center justify-center border border-black px-6 py-12 text-center',
+          tapControlsEnabled ? 'cursor-pointer select-none' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        {tapControlsEnabled ? (
+          <>
+            <button
+              type="button"
+              aria-label="Skip prompt"
+              className="absolute inset-y-0 left-0 w-1/2 bg-transparent"
+              onClick={onTapSkip}
+            />
+            <button
+              type="button"
+              aria-label="Mark prompt correct"
+              className="absolute inset-y-0 right-0 w-1/2 bg-transparent"
+              onClick={onTapCorrect}
+            />
+            <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-between px-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#1f7a3d] sm:px-6">
+              <span>Left = skip</span>
+              <span>Right = correct</span>
+            </div>
+          </>
+        ) : null}
+
+        <p className="relative z-10 text-4xl font-black uppercase leading-tight tracking-[0.04em] sm:text-6xl lg:text-8xl">
           {round.currentPrompt ?? 'No prompts left'}
         </p>
       </div>
